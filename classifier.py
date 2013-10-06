@@ -45,18 +45,45 @@ def parse_timeseries(timeseries):
     # Histogram of orientation
     lon = np.arctan2(y, x)
     lat = np.arctan2(z, np.sqrt(x*x+y*y))
-    out['hg_orientation'] = normalize_dist(np.histogram2d(lon, lat, bins=5, \
+    out['hg_orientation'] = normalize_dist(np.histogram2d(lon, lat, bins=20, \
             range=[[-np.pi, np.pi], [-np.pi/2, np.pi/2]])[0])
 
-    # Histogram of log of jerk magnitude
+    # 3D histogram of acceleration
+    out['hg_xyz'] = normalize_dist(np.histogramdd(
+        np.array([x,y,z]).T, bins=10, range=[[-15,15],[-15,15],[-15,15]])[0])
+
+    # Calculate jerk.
     dt = t[1:] - t[:-1]
     dx = x[1:] - x[:-1]
     dy = y[1:] - y[:-1]
     dz = z[1:] - z[:-1]
-    dr2 = np.sqrt(dx*dx + dy*dy + dz*dz)
-    jerk_good = (dt > 0) & (dt < 1000) & (dr2 > 0)
-    jerk = dr2[jerk_good] / dt[jerk_good]
+    jerk = np.sqrt(dx*dx + dy*dy + dz*dz)
+    dt_good = (dt > 0) & (dt < 1000) & (jerk > 0)
+    # take only vals where dt is good, and divide by dt
+    dt = dt[dt_good]
+    dx = dx[dt_good] / dt
+    dy = dy[dt_good] / dt
+    dz = dz[dt_good] / dt
+    jerk = jerk[dt_good] / dt
+    # also take x,y,z for good dt
+    gx = x[1:][dt_good]
+    gy = y[1:][dt_good]
+    gz = z[1:][dt_good]
+
+    #print np.min(jerk), np.max(jerk)
+
+    # Histogram of log of jerk magnitude
     out['hg_jerk'] = normalize_dist(np.histogram(np.log(jerk), bins=50, range=(-15,4))[0])
+
+    # 3D histogram of log of jerk magnitude
+    out['hg_jerk_xyz'] = normalize_dist(np.histogramdd(
+        np.array([dx,dy,dz]).T, bins=10, range=[[-15,15],[-15,15],[-15,15]])[0])
+
+    # Histogram of log of jerk magnitude in direction of acceleration
+    jerk_dot_acc = dx*gx + dy*gy + dz*gz
+    #print np.min(jerk_dot_acc), np.max(jerk_dot_acc)
+    out['hg_jerk_dot_acc'] = normalize_dist(np.histogram(np.log(np.abs(jerk_dot_acc)),
+        bins=20, range=(-6,6))[0])
 
     return out
 
@@ -77,16 +104,17 @@ def compare_histograms(hg_key, train_wisdom, test):
     t = test[hg_key]
 
     n = 1e-6 # prevent infinities
-    return np.array([ kl_div(t, w*(1-n)+t*n) for w in hw ])
+    d = np.array([ kl_div(t, w*(1-n)+t*n) for w in hw ])
+    d /= np.average(d)
+    return d
 
 # How close the test data is to the training data for each device.
 def get_dist_vector(qw):
     dm = compare_histograms('hg_mag', train_wisdom, qw)
     dj = compare_histograms('hg_jerk', train_wisdom, qw)
-    #do = compare_histograms('hg_orientation', train_wisdom, qw)
-    dm /= np.average(dm)
-    dj /= np.average(dj)
-    dv = dm + dj
+    dx = compare_histograms('hg_xyz', train_wisdom, qw)
+    #djx = compare_histograms('hg_jerk_xyz', train_wisdom, qw)
+    dv = dm+dj+dx
     dv /= np.average(dv)
     return dv
 
