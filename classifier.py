@@ -1,12 +1,12 @@
 from __future__ import division
-import pickle
+
 import pandas as pd
 import numpy as np
 from joblib import Parallel, delayed
-import functools
 import random
 
 # Earth mover's distance between two numpy arrays.
+# Requires the python-emd module.
 def my_emd(a, b):
     import emd
     pos = range(len(a))
@@ -112,7 +112,7 @@ def simulated_question():
 
 # If 1, then simulate the classification using a portion of the training data.
 # If 0, then answer the contest questions.
-simulate = 0
+simulate = 1
 
 # Number of CPUs to use.
 num_cpus = 4
