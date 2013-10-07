@@ -85,6 +85,12 @@ def parse_timeseries(timeseries):
     out['hg_jerk_dot_acc'] = normalize_dist(np.histogram(np.log(np.abs(jerk_dot_acc)),
         bins=20, range=(-6,6))[0])
 
+    time_of_day_bins = 24
+    ms_per_day = 8.64e7
+    time_of_day = np.array(t / ms_per_day * time_of_day_bins, dtype=int) % time_of_day_bins
+    out['hg_time_of_day'] = normalize_dist(np.histogram(time_of_day,
+        bins=time_of_day_bins, range=(0,time_of_day_bins))[0])
+
     return out
 
 data_stores = {}
@@ -114,7 +120,8 @@ def get_dist_vector(qw):
     dj = compare_histograms('hg_jerk', train_wisdom, qw)
     dx = compare_histograms('hg_xyz', train_wisdom, qw)
     #djx = compare_histograms('hg_jerk_xyz', train_wisdom, qw)
-    dv = dm+dj+dx
+    dh = compare_histograms('hg_time_of_day', train_wisdom, qw)
+    dv = dm+dj+dx+dh
     dv /= np.average(dv)
     return dv
 
